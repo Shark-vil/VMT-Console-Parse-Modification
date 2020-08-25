@@ -5,9 +5,4 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
-  <ItemGroup>
-    <Folder Include="Modules\" />
-    <Folder Include="Templates\" />
-  </ItemGroup>
-
 </Project>
