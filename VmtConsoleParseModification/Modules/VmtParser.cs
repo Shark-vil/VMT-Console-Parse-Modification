@@ -9,69 +9,94 @@ namespace VmtConsoleParseModification.Modules
 {
     public class VmtParser
     {
-        private static string NormalizePath(string FilePath)
+        public static string NormalizePath(string FilePath)
         {
             return Path.GetFullPath(new Uri(FilePath).LocalPath)
                        .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                       .ToUpperInvariant();
+                       .ToLower();
+                       //.ToUpperInvariant();
         }
 
         public static VmtTemplate ParseVmtFile(string FilePath)
         {
             string MaterialType = "VertexlitGeneric";
             var MaterialFields = new List<VmtTemplate.VmtField>();
+            var VmtObject = new VmtTemplate();
+            VmtObject.IsBrokenFile = true;
+            VmtObject.SetPath(FilePath);
 
-            FilePath = NormalizePath(FilePath);
+#if DEBUG
+            Console.WriteLine("File - " + FilePath);
+#endif
 
             using (var ReadingFile = new StreamReader(FilePath))
             {
-                string FileContent = ReadingFile.ReadToEnd();
-                FileContent = Regex.Replace(FileContent.Replace("\t", " "), @"[ ]{2,}", " ");
-
-                int StartSubContent = -1;
-                int EndSubContent = -1;
-                for (int i = 0; i < FileContent.Length; i++)
+                try
                 {
-                    if (FileContent[i] == '{' && StartSubContent == -1)
+                    string FileContent = ReadingFile.ReadToEnd();
+                    FileContent = Regex.Replace(FileContent.Replace("\t", " "), @"[ ]{2,}", " ");
+
+                    int StartSubContent = -1;
+                    int EndSubContent = -1;
+
+                    for (int i = 0; i < FileContent.Length; i++)
                     {
-                        StartSubContent = i;
+                        if (FileContent[i] == '{' && StartSubContent == -1)
+                        {
+                            StartSubContent = i;
+                            break;
+                        }
                     }
-                    else if (FileContent[i] == '}' && EndSubContent == -1)
+
+                    for (int i = FileContent.Length - 1; i >= 0; i--)
                     {
-                        EndSubContent = i;
-                        break;
+                        if (FileContent[i] == '}' && EndSubContent == -1)
+                        {
+                            EndSubContent = i;
+                            break;
+                        }
                     }
+
+                    MaterialType = FileContent.Trim().Substring(0, StartSubContent - 1).Trim();
+                    MaterialType = MaterialType.Replace("\"", string.Empty);
+
+                    string SubContent = FileContent.Substring(StartSubContent + 1, EndSubContent - StartSubContent - 1);
+                    string[] SubContentSplit = SubContent.Split(Environment.NewLine);
+
+                    for (int i = 0; i < SubContentSplit.Length; i++)
+                    {
+                        string Filed = SubContentSplit[i].Trim();
+
+                        if (Filed.Replace(" ", "") != string.Empty)
+                        {
+                            Filed = Filed.Replace("\"", string.Empty);
+                            string[] KeyAndValue = Filed.Split(' ', 2);
+
+                            MaterialFields.Add(new VmtTemplate.VmtField(KeyAndValue[0], KeyAndValue[1]));
+                        }
+                    }
+                /*
+                #if DEBUG
+                                Console.WriteLine("Type - " + MaterialType);
+                #endif
+
+                #if DEBUG
+                                foreach (var Filed in MaterialFields)
+                                    Console.WriteLine(Filed.Key + " - " + Filed.Value);
+                #endif
+                */
                 }
-
-                MaterialType = FileContent.Trim().Substring(0, StartSubContent - 1).Trim();
-                MaterialType = MaterialType.Replace("\"", string.Empty);
-
-                string SubContent = FileContent.Substring(StartSubContent + 1, EndSubContent - StartSubContent - 1);
-                string[] SubContentSplit = SubContent.Split(Environment.NewLine);
-
-                for (int i = 0; i < SubContentSplit.Length; i++)
+                catch
                 {
-                    string Filed = SubContentSplit[i].Trim();
-
-                    if (Filed.Replace(" ", "") != string.Empty)
-                    {
-                        Filed = Filed.Replace("\"", string.Empty);
-                        string[] KeyAndValue = Filed.Split(' ', 2);
-
-                        MaterialFields.Add(new VmtTemplate.VmtField(KeyAndValue[0], KeyAndValue[1]));
-                    }
+                    return VmtObject;
                 }
-#if DEBUG
-                Console.WriteLine("Type - " + MaterialType);
-#endif
+        }
 
-#if DEBUG
-                foreach (var Filed in MaterialFields)
-                    Console.WriteLine(Filed.Key + " - " + Filed.Value);
-#endif
+            VmtObject.MaterialType = MaterialType;
+            VmtObject.Values = MaterialFields;
+            VmtObject.IsBrokenFile = false;
 
-                return new VmtTemplate(MaterialType, MaterialFields);
-            }
+            return VmtObject;
         }
     }
 }
